@@ -45,7 +45,7 @@ main(int argc, char **argv) {
     if (argc != 2)
         quit("usage: %s [type]", appname);
 
-    srand((unsigned) time(NULL));
+    srand((unsigned) time(NULL));//由函数 rand 使用的随机数发生器,种子为当前时间
 
     dict_malloc_func = xmalloc;
 

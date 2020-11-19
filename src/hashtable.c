@@ -55,8 +55,8 @@ struct hash_node {
 
 struct hashtable {
     hash_node **table;
-    dict_compare_func cmp_func;
-    dict_hash_func hash_func;
+    dict_compare_func cmp_func; /* 同Java equals() */
+    dict_hash_func hash_func; /* 同Java hashcode() */
     size_t count;
     unsigned size;
 };
@@ -114,13 +114,14 @@ hashtable_new(dict_compare_func cmp_func, dict_hash_func hash_func, unsigned siz
 
     hashtable *table = MALLOC(sizeof(*table));
     if (table) {
-        table->size = dict_prime_geq(size);
-        table->table = MALLOC(table->size * sizeof(hash_node *));
+        table->size = dict_prime_geq(size);//质数的初始容量
+        table->table = MALLOC(table->size * sizeof(hash_node *));//注意这里是MALLOC的指针而不是直接开辟空间
         if (!table->table) {
             FREE(table);
             return NULL;
         }
-        memset(table->table, 0, table->size * sizeof(hash_node *));
+        memset(table->table, 0, table->size * sizeof(hash_node *));//如果不清空，可能会在测试当中出现野值
+
         table->cmp_func = cmp_func;
         table->hash_func = hash_func;
         table->count = 0;
@@ -162,17 +163,26 @@ hashtable_insert(hashtable *table, void *key) {
         hashtable_resize(table, table->size + 1);
     }
 
-    const unsigned hash = table->hash_func(key);
-    const unsigned mhash = hash % table->size;
+    const unsigned hash = table->hash_func(key);  /* Untruncated hash value. */
+    const unsigned mhash = hash % table->size;  /* truncated hash value. */
+
     hash_node *node = table->table[mhash];
     hash_node *prev = NULL;
+
+    //寻找插入的 node 地址，在同一个table[mhash]的链表里面 按照 Untruncated hash最小的在链表头部的方式插入
     while (node && hash >= node->hash) {
         if (hash == node->hash && table->cmp_func(key, node->key) == 0)
-            return (dict_insert_result) {&node->datum, false};
+            return (dict_insert_result) {&node->datum, false};// kv 对已经存在，插入失败
         prev = node;
         node = node->next;
     }
 
+
+    /**
+     这行语句可以拆成2句来理解，
+     hash_node *add =NULL;
+     add = MALLOC(sizeof(*add));注意这儿 使用的是 *add 而不是add, 因为 add在这儿是指针，*add 才是 hash_node
+     */
     hash_node *add = MALLOC(sizeof(*add));
     if (!add)
         return (dict_insert_result) {NULL, false};
